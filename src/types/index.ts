@@ -218,7 +218,7 @@ export interface PromptState {
 // ─── API Keys (stored in SecureStore) ────────────────────────
 
 export interface ApiKeys {
-  openai?: string;
+  anthropic?: string;
   elevenlabs?: string;
 }
 

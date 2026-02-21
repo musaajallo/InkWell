@@ -2,7 +2,7 @@
  * AI Poem Review Screen
  *
  * Generates and displays an AI-powered review of a poem.
- * Requires an OpenAI API key configured in Settings.
+ * Requires an Anthropic (Claude) API key configured in Settings.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -22,7 +22,7 @@ import { useApiKeys } from '../../../src/hooks/use-api-keys';
 import { usePoemStore } from '../../../src/stores/poem-store';
 import { useSettingsStore } from '../../../src/stores/settings-store';
 import { useAuthStore } from '../../../src/stores/auth-store';
-import { generatePoemReview } from '../../../src/services/openai-api';
+import { generatePoemReview } from '../../../src/services/anthropic-api';
 import { createReview as createReviewOnServer } from '../../../src/services/review-service';
 import { Spacing, FontSize, BorderRadius } from '../../../src/constants/theme';
 import type { PoemReview, ReviewTone } from '../../../src/types';
@@ -33,7 +33,7 @@ export default function ReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useAppTheme();
-  const { keys, hasOpenAiKey } = useApiKeys();
+  const { keys, hasAnthropicKey } = useApiKeys();
   const userId = useAuthStore((s) => s.user?.id ?? null);
 
   const poem = usePoemStore((s) => s.poems.find((p) => p.id === id));
@@ -54,10 +54,10 @@ export default function ReviewScreen() {
   const handleGenerateReview = useCallback(async () => {
     if (!poem) return;
 
-    if (!hasOpenAiKey) {
+    if (!hasAnthropicKey) {
       Alert.alert(
         'API Key Required',
-        'Add your OpenAI API key in Settings to generate AI reviews.',
+        'Add your Anthropic API key in Settings to generate AI reviews.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Go to Settings', onPress: () => router.push('/(tabs)/settings') },
@@ -75,37 +75,46 @@ export default function ReviewScreen() {
     setError(null);
 
     try {
-      // TODO: Replace with actual OpenAI API call via services/openai-api.ts
-      // For now, simulate a delay and show placeholder
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const review = await generatePoemReview(
+        keys.anthropic!,
+        {
+          title: poem.title,
+          body: poem.body,
+          formType: poem.formType,
+          tone: reviewTone,
+        },
+        poem.id
+      );
 
-      const mockReview: PoemReview = {
-        id: `review_${Date.now()}`,
-        poemId: poem.id,
-        summary: 'This poem explores themes of introspection and longing through vivid imagery and careful word choice. The language is both accessible and layered with meaning.',
-        themes: [
-          { name: 'Solitude', explanation: 'The speaker contemplates moments of quiet isolation, finding both peace and tension within stillness.' },
-          { name: 'Memory', explanation: 'Past experiences surface through sensory details, blurring the line between present observation and recollection.' },
-        ],
-        literaryDevices: [
-          { device: 'Imagery', example: '(from your poem)', explanation: 'Concrete sensory details ground the abstract emotions in physical experience.' },
-          { device: 'Enjambment', example: '(line breaks)', explanation: 'Lines flow into each other, creating momentum and mirroring the stream of thought.' },
-        ],
-        structureAnalysis: 'The poem uses free verse with intentional line breaks that guide the reader\'s pace. Stanza divisions mark shifts in emotional tone.',
-        interpretation: 'At its core, this poem grapples with the tension between holding on and letting go. The imagery suggests a speaker in transition, navigating change with quiet resilience.',
-        tone: reviewTone,
-        personalNotes: '',
-        generatedAt: new Date().toISOString(),
-        poemBodyHash: poem.body.slice(0, 32),
-      };
+      // Save review on the poem locally
+      updatePoem(poem.id, { review });
 
-      updatePoem(poem.id, { review: mockReview });
+      // Persist to Supabase in the background
+      if (userId) {
+        createReviewOnServer({
+          userId,
+          poemId: poem.id,
+          summary: review.summary,
+          themes: review.themes,
+          literaryDevices: review.literaryDevices,
+          structureAnalysis: review.structureAnalysis,
+          interpretation: review.interpretation,
+          tone: review.tone,
+          poemBodyHash: review.poemBodyHash,
+          personalNotes: review.personalNotes,
+        }).catch(() => {
+          // Background sync failure — review is still saved locally
+        });
+      }
+
       setStatus('done');
-    } catch {
-      setError('Failed to generate review. Please try again.');
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to generate review. Please try again.';
+      setError(message);
       setStatus('error');
     }
-  }, [poem, hasOpenAiKey, reviewTone, updatePoem, router]);
+  }, [poem, hasAnthropicKey, keys.anthropic, reviewTone, updatePoem, userId, router]);
 
   // ─── Not Found ─────────────────────────────────────────────
 
@@ -157,9 +166,9 @@ export default function ReviewScreen() {
               <Feather name="cpu" size={18} color="#FFFFFF" />
               <Text style={styles.generateBtnText}>Generate Review</Text>
             </TouchableOpacity>
-            {!hasOpenAiKey && (
+            {!hasAnthropicKey && (
               <Text style={[styles.apiWarning, { color: colors.warning }]}>
-                OpenAI API key required — add it in Settings
+                Anthropic API key required — add it in Settings
               </Text>
             )}
           </View>

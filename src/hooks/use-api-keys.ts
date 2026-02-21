@@ -43,10 +43,10 @@ export function useApiKeys() {
     }
   }, []);
 
-  const setOpenAiKey = useCallback(
+  const setAnthropicKey = useCallback(
     (key: string) => {
-      const updated = { ...keys, openai: key || undefined };
-      if (!key) delete updated.openai;
+      const updated = { ...keys, anthropic: key || undefined };
+      if (!key) delete updated.anthropic;
       persist(updated);
     },
     [keys, persist]
@@ -61,9 +61,9 @@ export function useApiKeys() {
     [keys, persist]
   );
 
-  const clearOpenAiKey = useCallback(() => {
+  const clearAnthropicKey = useCallback(() => {
     const updated = { ...keys };
-    delete updated.openai;
+    delete updated.anthropic;
     persist(updated);
   }, [keys, persist]);
 
@@ -80,12 +80,12 @@ export function useApiKeys() {
   return {
     keys,
     isLoaded,
-    setOpenAiKey,
+    setAnthropicKey,
     setElevenLabsKey,
-    clearOpenAiKey,
+    clearAnthropicKey,
     clearElevenLabsKey,
     clearAllKeys,
-    hasOpenAiKey: Boolean(keys.openai),
+    hasAnthropicKey: Boolean(keys.anthropic),
     hasElevenLabsKey: Boolean(keys.elevenlabs),
   };
 }

@@ -14,5 +14,5 @@ export * as profileService from './profile-service';
 // External API clients
 export * as poetryDbApi from './poetry-db-api';
 export * as datamuseApi from './datamuse-api';
-export * as openaiApi from './openai-api';
+export * as anthropicApi from './anthropic-api';
 export * as elevenlabsApi from './elevenlabs-api';

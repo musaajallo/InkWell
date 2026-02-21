@@ -1,14 +1,14 @@
 /**
- * OpenAI API Client
+ * Anthropic (Claude) API Client
  *
- * Generates AI-powered poem reviews using GPT-4o-mini.
+ * Generates AI-powered poem reviews using Claude.
  * User must provide their own API key (stored in SecureStore).
  *
- * Base URL: https://api.openai.com/v1
- * Endpoint: POST /chat/completions
+ * Base URL: https://api.anthropic.com/v1
+ * Endpoint: POST /messages
  */
 
-import { API_URLS, API_TIMEOUT, OPENAI_MODEL } from '@/utils/constants';
+import { API_URLS, API_TIMEOUT, ANTHROPIC_MODEL } from '@/utils/constants';
 import type {
   PoemReview,
   ReviewTone,
@@ -20,33 +20,34 @@ import * as Crypto from 'expo-crypto';
 
 // ─── Types ───────────────────────────────────────────────────
 
-interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+interface MessageContent {
+  type: 'text';
+  text: string;
+}
+
+interface AnthropicMessage {
+  role: 'user' | 'assistant';
   content: string;
 }
 
-interface ChatCompletionResponse {
+interface AnthropicResponse {
   id: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
+  type: 'message';
+  role: 'assistant';
+  content: MessageContent[];
+  model: string;
+  stop_reason: string | null;
   usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+    input_tokens: number;
+    output_tokens: number;
   };
 }
 
-interface OpenAIError {
+interface AnthropicError {
+  type: 'error';
   error: {
-    message: string;
     type: string;
-    code: string | null;
+    message: string;
   };
 }
 
@@ -106,41 +107,45 @@ ${input.body}`;
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-async function chatCompletion(
+async function sendMessage(
   apiKey: string,
-  messages: ChatMessage[]
+  systemPrompt: string,
+  messages: AnthropicMessage[]
 ): Promise<string> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT.OPENAI);
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT.ANTHROPIC);
 
   try {
-    const response = await fetch(`${API_URLS.OPENAI}/chat/completions`, {
+    const response = await fetch(`${API_URLS.ANTHROPIC}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages,
-        temperature: 0.7,
+        model: ANTHROPIC_MODEL,
         max_tokens: 1500,
+        system: systemPrompt,
+        messages,
       }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      const errBody: OpenAIError = await response.json().catch(() => ({
-        error: { message: `HTTP ${response.status}`, type: 'api_error', code: null },
+      const errBody: AnthropicError = await response.json().catch(() => ({
+        type: 'error' as const,
+        error: { type: 'api_error', message: `HTTP ${response.status}` },
       }));
       throw new Error(errBody.error.message);
     }
 
-    const data: ChatCompletionResponse = await response.json();
-    const content = data.choices[0]?.message?.content;
-    if (!content) throw new Error('Empty response from OpenAI');
+    const data: AnthropicResponse = await response.json();
+    const textBlock = data.content.find((c) => c.type === 'text');
+    if (!textBlock) throw new Error('Empty response from Claude');
 
-    return content;
+    return textBlock.text;
   } finally {
     clearTimeout(timeout);
   }
@@ -164,19 +169,19 @@ function parseReviewJSON(raw: string): RawReviewJSON {
 
 /**
  * Generate an AI review for a poem.
- * Requires a valid OpenAI API key.
+ * Requires a valid Anthropic API key.
  */
 export async function generatePoemReview(
   apiKey: string,
   input: ReviewInput,
   poemId: string
 ): Promise<PoemReview> {
-  const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(input.tone) },
+  const systemPrompt = buildSystemPrompt(input.tone);
+  const messages: AnthropicMessage[] = [
     { role: 'user', content: buildUserPrompt(input) },
   ];
 
-  const rawContent = await chatCompletion(apiKey, messages);
+  const rawContent = await sendMessage(apiKey, systemPrompt, messages);
   const parsed = parseReviewJSON(rawContent);
 
   const review: PoemReview = {
@@ -201,12 +206,23 @@ export async function generatePoemReview(
 }
 
 /**
- * Validate an OpenAI API key by making a minimal request.
+ * Validate an Anthropic API key by making a minimal request.
  */
 export async function validateApiKey(apiKey: string): Promise<boolean> {
   try {
-    const response = await fetch(`${API_URLS.OPENAI}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const response = await fetch(`${API_URLS.ANTHROPIC}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'Hi' }],
+      }),
     });
     return response.ok;
   } catch {

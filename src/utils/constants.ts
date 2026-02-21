@@ -27,14 +27,14 @@ export const SECURE_STORE_KEYS = {
 export const API_URLS = {
   POETRY_DB: 'https://poetrydb.org',
   DATAMUSE: 'https://api.datamuse.com',
-  OPENAI: 'https://api.openai.com/v1',
+  ANTHROPIC: 'https://api.anthropic.com/v1',
   ELEVENLABS: 'https://api.elevenlabs.io/v1',
 } as const;
 
 export const API_TIMEOUT = {
   POETRY_DB: 10_000,
   DATAMUSE: 5_000,
-  OPENAI: 30_000,
+  ANTHROPIC: 30_000,
   ELEVENLABS: 60_000,
 } as const;
 
@@ -71,9 +71,9 @@ export const DEFAULT_COLLECTION_IDS = {
   DRAFTS: 'drafts',
 } as const;
 
-// ─── OpenAI ──────────────────────────────────────────────────
+// ─── Anthropic ───────────────────────────────────────────────
 
-export const OPENAI_MODEL = 'gpt-4o-mini';
+export const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
 
 // ─── TTS ─────────────────────────────────────────────────────
 

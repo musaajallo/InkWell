@@ -107,9 +107,9 @@ export default function SettingsScreen() {
 
   const {
     keys,
-    setOpenAiKey,
+    setAnthropicKey,
     setElevenLabsKey,
-    clearOpenAiKey,
+    clearAnthropicKey,
     clearElevenLabsKey,
   } = useApiKeys();
 
@@ -295,13 +295,13 @@ export default function SettingsScreen() {
         </Text>
 
         <ApiKeyInput
-          label="OpenAI API Key"
-          value={keys.openai ?? ''}
-          placeholder="sk-..."
-          onChangeText={setOpenAiKey}
-          onClear={clearOpenAiKey}
-          validate={(key) => key.startsWith('sk-') && key.length > 20}
-          helpText="Required for poem reviews and analysis"
+          label="Anthropic API Key"
+          value={keys.anthropic ?? ''}
+          placeholder="sk-ant-..."
+          onChangeText={setAnthropicKey}
+          onClear={clearAnthropicKey}
+          validate={(key) => key.startsWith('sk-ant-') && key.length > 20}
+          helpText="Required for AI poem reviews (Claude)"
         />
 
         <ApiKeyInput
